@@ -1,0 +1,6 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<parameters>
+  <parameter name="MlaDatabase-Web.config Connection String" description="MlaDatabase Connection String used in web.config by the application to access the database." defaultValue="Data Source=database-gaurav-mla.cej3fan5nz2p.us-west-1.rds.amazonaws.com,1433;Initial Catalog=MlaDatabase;User ID=gaurav;Password=alskjojf029j3fij2093" tags="SqlConnectionString">
+    <parameterEntry kind="XmlFile" scope="C:\\Users\\dell\\Desktop\\College\\CSC258\\Project\\NET\ Server\ Project\\jinsongo-mla-server-d05b9a4780cf\\MlaWebApi\\obj\\Release\\Package\\PackageTmp\\Web\.config$" match="/configuration/connectionStrings/add[@name='MlaDatabase']/@connectionString" />
+  </parameter>
+</parameters>

@@ -1,0 +1,30 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30011.22
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MlaWebApi", "MlaWebApi\MlaWebApi.csproj", "{3199A5D9-D28E-4D8F-8FA3-7D68D73FD50C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Notes", "Notes", "{146E99C6-4386-4613-8769-4B31E1838CC1}"
+	ProjectSection(SolutionItems) = preProject
+		Notes.txt = Notes.txt
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3199A5D9-D28E-4D8F-8FA3-7D68D73FD50C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3199A5D9-D28E-4D8F-8FA3-7D68D73FD50C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3199A5D9-D28E-4D8F-8FA3-7D68D73FD50C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3199A5D9-D28E-4D8F-8FA3-7D68D73FD50C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {829F13C2-EB5B-4F9E-B48B-99957479C1D4}
+	EndGlobalSection
+EndGlobal

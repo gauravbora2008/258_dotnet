@@ -1,0 +1,93 @@
+CSC 258 - Gaurav Bora
+Encrypted Social Networking App Demo
+---
+
+Roadmap:
+
+27 []  0. Learn Android (understand app code to see what parts I can re use and be able to code)
+28 []  1. Login/Registration (reuse code? copy-paste-edit, redirect to new tables? or reuse tables?)
+29 []  2. Create Post (Only text)
+29 []  3. Fetch Posts
+
+30 []  4. Add/Remove/View Friend(s)
+ 1 []  5. View Friend's Posts (News Feed)
+
+ 2 []  6. Create Group
+ 2 []  7. Add Members  
+ 3 []  8. Post in Group 
+ 3 []  9. See Group Posts
+
+ share posts?
+ post visibility?
+
+ 5 [] 10. Encrypt Posts
+
+
+ Tables:
+ ======
+
+ Users Table: user_id, user_name, password
+ Public key table: user_id, user_publickey
+ Group Table: group_id, group_name, owner_id, member_id?
+ Group Key Table: owner_user_id, group_key, group_id, version, group_status
+ Posts Table: author_id, encr_post_data, postKey, timestamp
+
+
+ When a user leaves the group, group key is changed. So the OneTime PostKey will not be decryptable by non-member
+ Encrypt and store or encrypt before sending?
+ friend request is to be approved? group joining is not approved. probably not since the two are being treated as same
+ Does server saves all the public keys? I guess yes **
+
+ Encryption (Assume whatever is happening in server is safe?):
+
+ 1. UserA Registers:
+ ==================
+ UserA generates K_A_priv, K_A_pub, default group key K_A_G_0
+ K_A_pub is sent to server (Needed? Yes, because when other users post in this group)
+ Also, {K_A_G_0} K_A_pub is sent to server
+ server saves {K_A_G_0}K_A_pub in Group key table
+
+ 2. User Login:
+ ==============
+ check group status
+ if dirty when someone leaves the friend's group, the key is changed and I need the new key then
+when I login I see the group is dirty, I generate a new group key and encrypt the new 
+group key with every member's public key i.e. add a row for each group member and set
+group status and version
+
+ 3. Joining a group:
+ ===================
+ UserB sends a friend request to UserA
+ UserA sends approval to server // ignore rejection case for now
+ UserA gets K_B_pub and sends {K_A_G_0}K_B_pub to the server // so that B will be able to decrypt A's post keys
+ UserB gets K_A_pub and sends {K_B_G_0}K_A_pub to the server // so that A will be able to decrypt B 's post keys
+ This marks that UserB joins UserA's friend list group (*) // no need to change the key here, basically B is A's friend because B has A's group key, 
+ UserB will receive {K_A_G_0}K_B_pub
+ UserA receives {K_B_G_0}K_A_pub
+ 
+ 4. Creating a post:
+ ===================
+ UserA writes a post
+ UserA generates a one-time session key KS_ONETIME
+ UserA encrypts {POST}KS_ONETIME
+ UserA encrypts {KS_ONETIME}K_B_G_0
+ checks groupStatus for the group it is posting in
+ [{POST}KS_ONETIME, {KS_ONETIME}K_B_G_0] is sent to the server
+ UserB logs in, requests posts
+ server checks UserB's friend's posts and sends back [{POST}KS_ONETIME, {KS_ONETIME}K_B_G_0]
+ UserB decrypts {KS_ONETIME}K_B_G_0 using K_G_A_0 to get KS_ONETIME // symmetric
+ UserB decrypts {POST}KS_ONETIME using KS_ONETIME
+
+ 5. Get Posts:
+ =============
+ Check all the groups that I am part of
+ Get latest encrypted group keys for the groups that I am a part of (Select group_id where group member is 'UserA' AND group_status IS '0')
+ Get posts from all the groups that I am part of
+
+ 6. When a user leaves group:
+ ============================
+ UserC sends a leave group notification
+ server marks the group key status to dirty (0, 1) in the group status table
+ when UserZ logs in and sees that group status is dirty, add a row with new group key for each member (UserZ has group members public keys?)
+ UserA generates a new group key K_G_0_ver2 and for all group members [{K_G_0_ver2}K_A_pub, {K_G_0_ver2}K_B_pub, ...]
+ If UserA is already loged in, before posting it checks group status, this should be a transaction (Entity)*
