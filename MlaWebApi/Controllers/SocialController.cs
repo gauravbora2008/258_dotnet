@@ -45,9 +45,9 @@ namespace MlaWebApi.Controllers
         public HttpResponseMessage RegisterNewUser(
             string username, 
             string password, 
-            string publicKey, 
+            string publicKeyString, 
             string fullname,
-            string groupKey)
+            string encryptedGroupKey)
         {
 
             DataSet dsData = new DataSet("user");
@@ -56,30 +56,46 @@ namespace MlaWebApi.Controllers
 
             try
             {
-
-                String commandText = "insert into sn_user (username, password, publicKey, fullname) values ('"
-                    + username + "','"
-                    + password + "','"
-                    + publicKey + "','"
-                    + fullname + "');"
-                    + "insert into sn_user (username, password, publicKey, fullname) values ('"
-                    + username + "','"
-                    + password + "','"
-                    + publicKey + "','"
-                    + fullname + "');";
+                String commandText = $"insert into sn_user (username, password, publicKey, fullname) " +
+                                    $" values ('{username}', '{password}', '{publicKeyString}', '{fullname}');";
 
                 SqlCommand comm = new SqlCommand(commandText, cnn);
-                //int countUpdated =comm.ExecuteNonQuery();
-                SqlDataAdapter sqlada = new SqlDataAdapter(comm);
-                sqlada.Fill(dsData);
+                SqlDataAdapter Sqlda = new SqlDataAdapter(comm);
+                DataSet dsDatast = new DataSet("newUser");
+                Sqlda.Fill(dsDatast);
 
-                var response = Request.CreateResponse<string>(System.Net.HttpStatusCode.Found, "User added " + username);
+                SqlCommand comm2 = new SqlCommand($"Select user_id from sn_user where username = '{username}'", cnn);
+                SqlDataAdapter Sqlda2 = new SqlDataAdapter(comm2);
+                dsData = new DataSet();
+                Sqlda2.Fill(dsData);
+
+                int userId = Int32.Parse(dsData.Tables[0].Rows[0]["user_id"].ToString());
+
+                SqlCommand comm3 = new SqlCommand($"insert into sn_group (group_name, group_owner_id, member_id) " +
+                                                $"values ('friends_group', '{userId}', '{userId}')", cnn);
+                SqlDataAdapter Sqlda3 = new SqlDataAdapter(comm3);
+                dsData = new DataSet();
+                Sqlda3.Fill(dsData);
+
+                SqlCommand comm4 = new SqlCommand($"Select group_id from sn_group where group_name = 'friends_group' and group_owner_id = '{userId}'", cnn);
+                SqlDataAdapter Sqlda4 = new SqlDataAdapter(comm4);
+                dsData = new DataSet();
+                Sqlda4.Fill(dsData);
+
+                int groupId = Int32.Parse(dsData.Tables[0].Rows[0]["group_id"].ToString());
+
+                SqlCommand comm5 = new SqlCommand($"insert into sn_group_key_table (owner_id, member_id, group_key, group_id, key_version, key_status) values ('{userId}', '{userId}', '{encryptedGroupKey}', '{groupId}', '1', '0')", cnn);
+                SqlDataAdapter Sqlda5 = new SqlDataAdapter(comm5);
+                dsData = new DataSet();
+                Sqlda5.Fill(dsData);                
+
+                var response = Request.CreateResponse<string>(System.Net.HttpStatusCode.Found, "User added id: " + userId + "friends group id : " + groupId);
                 cnn.Close();
                 return response;
             }
             catch (Exception e)
             {
-                var response = Request.CreateResponse<string>(System.Net.HttpStatusCode.BadRequest, "Error! User could not be added");
+                var response = Request.CreateResponse<string>(System.Net.HttpStatusCode.BadRequest, e.ToString() + "\n\n" + dsData);
                 cnn.Close();
                 return response;
             }
