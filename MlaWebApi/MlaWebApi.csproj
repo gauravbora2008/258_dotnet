@@ -129,6 +129,8 @@
     <Compile Include="App_Start\FilterConfig.cs" />
     <Compile Include="App_Start\RouteConfig.cs" />
     <Compile Include="App_Start\WebApiConfig.cs" />
+    <Compile Include="Models\GetGroupsByMemberIdModel.cs" />
+    <Compile Include="Models\SN_UserLogin.cs" />
     <Compile Include="Controllers\SocialController.cs" />
     <Compile Include="Controllers\AdminController.cs" />
     <Compile Include="Controllers\DeEnrollStudentController.cs" />
