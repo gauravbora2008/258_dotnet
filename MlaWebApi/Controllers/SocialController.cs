@@ -11,6 +11,8 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
+using System.Text;
+using System.Net.Http.Headers;
 
 namespace MlaWebApi.Controllers
 {
@@ -25,74 +27,20 @@ namespace MlaWebApi.Controllers
             cnn = new SqlConnection(cfmgr);
             cnn.Open();
 
-            SqlCommand comm = new SqlCommand($"Select user_id, fullname, publicKey from sn_user where username = '{username}' and password = '{password}'", cnn);
+            SqlCommand comm = new SqlCommand($"Select user_id, username, fullname, publicKey from sn_user where username = '{username}' and password = '{password}'", cnn);
             SqlDataAdapter Sqlda = new SqlDataAdapter(comm);
 
             DataSet loginDataSet = new DataSet("userLogin");
             Sqlda.Fill(loginDataSet);
-
-            // Check if the result of the query is null
-            // Else :
-            /* - find out all the groups that I am part of (select group_id from sn_group where member_id = user_id )
-             * 
-             *      1) for each group_id: check group statuses for latest version keys if there are any invalid keys (
-             *          SELECT MAX(key_version) AS Latest_Key_Version, group_id FROM [MlaDatabase].[dbo].[sn_group_key_table] where             key_status = 1 and group_id in (1,2, 3) GROUP BY group_id 
-             *          
-             *          if any group has key_status = 1 i.e. invalid, add a row for each member with new keys
-             *          
-             *          Response: the group_ids, current_key_version public_keys of group members:
-             *              owner_id = 1
-             *              current_key_version = 3
-             *              group_id = 1
-             *              member_id = 43
-             *              public_key = '43spublickey' (select publickey from sn_user where user_id = member_id) consider join?
-             *              
-             *           App action: for each such record, generate a new group key, use member's public key to encrypt the group                         key and create a record to be sent back:
-             *              owner_id = 1
-             *              member_id = 43
-             *              enc_group_key = 'ad98983h08fh093'
-             *              group_id = 1
-             *              key_version = current_key_version + 1
-             *              key_status = 0 (clean)
-             *              
-             *              (there should be only one 0 for a members all keys in a group_id)
-             *              
-             *           server Action: insert into group_key_table values (owner_id, member_id, enc_group_key, group_id,       
-             *                                           key_version, key_status)
-             *                                           
-             *                                           
-             *                                           
-             *      2) get posts - select author_id, fullname, group_id, post_data, post_key from poststable where member_id = userid
-             *      
-             *      3) write posts - 1) get groupkey for the group i am posting in 
-             *                       2) generate a post_key
-             *                       3) encrypt the post with post_key
-             *                       4) encrypt the post_key with group_key
-             *                       
-             *               POST : author_id = user_id
-             *                      group_id = group_id in which post is being made
-             *                      post_data = post text encrypted with post_key
-             *                      post_key = post_key string encrypted with group_key
-             *                      timestamp = time of post
-             *                      
-             *      4) create group
-             *      
-             *      5) join group
-             *      
-             *      6) add friend
-             *      
-             *      
-             *       post visibility - later
-            
-            */
 
             foreach (DataRow row in loginDataSet.Tables[0].Rows)
             {
                 yield return new SN_UserLogin
                 {
                     user_id = Int16.Parse(Convert.ToString(row["user_id"])),
-                    fullname = Convert.ToString(row["fullname"]),
-                    publicKey = Convert.ToString(row["publicKey"])
+                    fullname = Convert.ToString(row["fullname"]).Trim(),
+                    publicKey = Convert.ToString(row["publicKey"]).Trim(),
+                    username = Convert.ToString(row["username"]).Trim()
                 };
             }
 
@@ -127,7 +75,8 @@ namespace MlaWebApi.Controllers
             cnn = new SqlConnection(cfmgr);
             cnn.Open();
 
-            SqlCommand comm = new SqlCommand($"Select group_id, group_name from sn_group where member_id = {memberId}", cnn);
+            SqlCommand comm = new SqlCommand($"SELECT T1.group_id, group_name, group_key FROM sn_group T1 INNER JOIN sn_group_key_table T2 ON T1.group_id = T2.group_id where T1.member_id = {memberId}", cnn);
+
             SqlDataAdapter Sqlda = new SqlDataAdapter(comm);
             DataSet dsDatast = new DataSet("groups");
             Sqlda.Fill(dsDatast);
@@ -137,30 +86,75 @@ namespace MlaWebApi.Controllers
                 yield return new GetGroupsByMemberIdModel
                 {
                     group_id = Int32.Parse(Convert.ToString(row["group_id"]).Trim()),
-                    group_name = Convert.ToString(row["group_name"]).Trim()
+                    group_name = Convert.ToString(row["group_name"]).Trim(),
+                    group_key = Convert.ToString(row["group_key"]).Trim()
                 };
             }
         }
 
-        //public IEnumerable<GetGroupsByMemberIdModel> CreateGroup(int ownerId)
-        //{
-        //    cnn = new SqlConnection(cfmgr);
-        //    cnn.Open();
+        public IEnumerable<GetGroupsByMemberIdModel> GetGroupsByNotAMemberId(int notJoinedMemberId)
+        {
+            cnn = new SqlConnection(cfmgr);
+            cnn.Open();
 
-        //    SqlCommand comm = new SqlCommand($"insert into group_id, group_name from sn_group where member_id = {ownerId}", cnn);
-        //    SqlDataAdapter Sqlda = new SqlDataAdapter(comm);
-        //    DataSet dsDatast = new DataSet("groups");
-        //    Sqlda.Fill(dsDatast);
+            SqlCommand comm = new SqlCommand(
+                $"SELECT T1.group_id, T1.group_owner_id, T3.fullname, group_name, group_key " +
+                $"FROM sn_group T1 " +
+                $"INNER JOIN sn_group_key_table T2 ON T1.group_id = T2.group_id " +
+                $"INNER JOIN sn_user T3 ON T1.group_owner_id = T3.user_id " +
+                $"where T1.member_id != {notJoinedMemberId}", cnn);
 
-        //    foreach (DataRow row in dsDatast.Tables[0].Rows)
-        //    {
-        //        yield return new GetGroupsByMemberIdModel
-        //        {
-        //            group_id = Int32.Parse(Convert.ToString(row["group_id"]).Trim()),
-        //            group_name = Convert.ToString(row["group_name"]).Trim()
-        //        };
-        //    }
-        //}
+            SqlDataAdapter Sqlda = new SqlDataAdapter(comm);
+            DataSet dsDatast = new DataSet("groups2");
+            Sqlda.Fill(dsDatast);
+
+            foreach (DataRow row in dsDatast.Tables[0].Rows)
+            {
+                yield return new GetGroupsByMemberIdModel
+                {
+                    group_owner_id = Convert.ToString(row["group_owner_id"]).Trim(),
+                    group_id = Int32.Parse(Convert.ToString(row["group_id"]).Trim()),
+                    group_name = Convert.ToString(row["group_name"]).Trim(),
+                    group_key = Convert.ToString(row["group_key"]).Trim(),
+                    owner_fullname = Convert.ToString(row["fullname"]).Trim()
+                };
+            }
+        }
+
+        public IEnumerable<GetPostsByMemberIdModel> GetPosts(int userId2)
+        {
+            cnn = new SqlConnection(cfmgr);
+            cnn.Open();
+
+            SqlCommand comm = new SqlCommand(
+                $"SELECT T1.author_id, T2.fullname, T1.group_id, T3.group_name, T4.group_key, " +
+                $"T1.post_data, T1.post_key, T1.timestamp " +
+                $"FROM sn_posts T1 " +
+                $"INNER JOIN sn_user T2 ON T1.author_id = T2.user_id " +
+                $"INNER JOIN sn_group T3 ON T1.group_id = T3.group_id " +
+                $"INNER JOIN sn_group_key_table T4 ON T1.group_id = T4.group_id " +
+                $"where T1.author_id = '{userId2}'", cnn);
+
+            SqlDataAdapter Sqlda = new SqlDataAdapter(comm);
+            DataSet dsDatast = new DataSet("groups");
+            Sqlda.Fill(dsDatast);
+
+            foreach (DataRow row in dsDatast.Tables[0].Rows)
+            {
+                yield return new GetPostsByMemberIdModel
+                {
+
+                    authod_id = Convert.ToString(row["author_id"]).Trim(),
+                    fullname = Convert.ToString(row["fullname"]).Trim(),
+                    group_id = Convert.ToString(row["group_id"]).Trim(),
+                    group_name = Convert.ToString(row["group_name"]).Trim(),
+                    group_key = Convert.ToString(row["group_key"]).Trim(),
+                    post_data = Convert.ToString(row["post_data"]).Trim(),
+                    post_key = Convert.ToString(row["post_key"]).Trim(),
+                    timestamp = Convert.ToString(row["timestamp"]).Trim()
+                };
+            }
+        }
 
 
         public HttpResponseMessage RegisterNewUser(
@@ -218,7 +212,7 @@ namespace MlaWebApi.Controllers
             {
                 if (e.ToString().Contains("Violation of PRIMARY KEY"))
                 {
-                    var response = Request.CreateResponse<string>(System.Net.HttpStatusCode.BadRequest, "User Already Exists");
+                    var response = Request.CreateResponse<string>(System.Net.HttpStatusCode.BadRequest, "User Already Exists " + e.ToString());
                     return response;
                 }
                 else
@@ -277,94 +271,116 @@ namespace MlaWebApi.Controllers
 
         }
 
+        public HttpResponseMessage CreateNewPost(
+           string author_id,
+           string group_id,
+           string post_key,
+           string post_data,
+           string timestamp
+            )
+        {
+
+            DataSet dsData = new DataSet("user");
+            cnn = new SqlConnection(cfmgr);
+            cnn.Open();
+
+            try
+            {
+
+                SqlCommand comm3 = new SqlCommand($"insert into sn_posts (author_id, group_id, post_key, post_data, timestamp) " +
+                                                $"values ('{author_id}', '{group_id}', '{post_key}', '{post_data}', '{timestamp}')", cnn);
+                SqlDataAdapter Sqlda3 = new SqlDataAdapter(comm3);
+                dsData = new DataSet();
+                Sqlda3.Fill(dsData);
+
+                var response = Request.CreateResponse<string>(System.Net.HttpStatusCode.OK, "Post Added !");
+
+                cnn.Close();
+                return response;
+            }
+            catch (Exception e)
+            {
+                var response = Request.CreateResponse<string>(System.Net.HttpStatusCode.BadRequest, e.ToString());
+                cnn.Close();
+                return response;
+            }
+
+        }
+
+        public HttpResponseMessage CreateNewAddRequest(
+          string user_id,
+          string group_id,
+          string group_owner_id
+           )
+        {
+
+            DataSet dsData = new DataSet("addRequest");
+            cnn = new SqlConnection(cfmgr);
+            cnn.Open();
+
+            try
+            {
+
+                SqlCommand comm3 = new SqlCommand(
+                    $"insert into sn_add_requests (user_id, group_id, group_owner_id) " +
+                    $"values ('{user_id}', '{group_id}', '{group_owner_id}')", cnn);
+
+                SqlDataAdapter Sqlda3 = new SqlDataAdapter(comm3);
+                dsData = new DataSet();
+                Sqlda3.Fill(dsData);
+
+                var response = Request.CreateResponse<string>(System.Net.HttpStatusCode.OK, "Request Sent !");
+
+                cnn.Close();
+                return response;
+            }
+            catch (Exception e)
+            {
+                var response = Request.CreateResponse<string>(System.Net.HttpStatusCode.BadRequest, e.ToString());
+                cnn.Close();
+                return response;
+            }
+
+        }
+
+        public IEnumerable<GetPendingAddRequestsModel> GetPendingAddRequests(string user_id)
+        {
 
 
-        //public IEnumerable<Admin> GetAllAdmin()
-        //{
-        //    cnn = new SqlConnection(cfmgr);
-        //    cnn.Open();
+            cnn = new SqlConnection(cfmgr);
+            cnn.Open();
 
-        //    SqlCommand comm = new SqlCommand("Select idAdmin, firstName, lastName, userId, telephone, address, aliasMailId, emailId, skypeId  from admin", cnn);
-        //    SqlDataAdapter Sqlda = new SqlDataAdapter(comm);
-        //    DataSet dsDatast = new DataSet("admin");
-        //    Sqlda.Fill(dsDatast);
+            SqlCommand comm3 = new SqlCommand(
+                $"SELECT T1.user_id, T3.publicKey, T1.group_id, T2.group_key, T4.group_name, T1.group_owner_id " +
+                $"FROM sn_add_requests T1 " +
+                $"INNER JOIN sn_user T3 ON T1.user_id = T3.user_id " +
+                $"INNER JOIN sn_group_key_table T2 ON T1.group_id = T2.group_id " +
+                $"INNER JOIN sn_group T4 ON T1.group_id = T4.group_id " +
+                $"where T1.group_owner_id = '{user_id}'", cnn);
 
-        //    foreach (DataRow row in dsDatast.Tables[0].Rows)
-        //    {
-        //        yield return new Admin
-        //        {
-        //            idAdmin = Convert.ToString(row["idAdmin"]),
-        //            firstName = Convert.ToString(row["firstName"]),
-        //            lastName = Convert.ToString(row["lastName"]),
-        //            userId = Int32.Parse(Convert.ToString(row["userId"])),
-        //            telephone = Convert.ToString(row["telephone"]),
-        //            address = Convert.ToString(row["address"]),
-        //            aliasMailId = Convert.ToString(row["aliasMailId"]),
-        //            emailId = Convert.ToString(row["emailId"]),
-        //            skypeId = Convert.ToString(row["skypeId"])
-        //        };
-        //    }
+            SqlDataAdapter Sqlda3 = new SqlDataAdapter(comm3);
+            DataSet psDataSet = new DataSet("pendingAddRequests");
+            Sqlda3.Fill(psDataSet);
 
-        //}
+            foreach (DataRow row in psDataSet.Tables[0].Rows)
+            {
+                yield return new GetPendingAddRequestsModel
+                {
 
-        //public IEnumerable<Admin> GetAdminByUserName(string userName)
-        //{
+                    user_id = Convert.ToString(row["user_id"]).Trim(),
+                    public_key = Convert.ToString(row["publicKey"]).Trim(),
+                    group_id = Convert.ToString(row["group_id"]).Trim(),
+                    group_key = Convert.ToString(row["group_key"]).Trim(),
+                    group_name = Convert.ToString(row["group_name"]).Trim(),
+                    group_owner_id = Convert.ToString(row["group_owner_id"]).Trim(),
 
-        //    cnn = new SqlConnection(cfmgr);
-        //    cnn.Open();
-
-        //    SqlCommand comm = new SqlCommand("Select idAdmin, firstName, lastName, userId, telephone, address, aliasMailId, emailId, skypeId  from admin where idAdmin = '" + userName + "'", cnn);
-        //    SqlDataAdapter Sqlda = new SqlDataAdapter(comm);
-
-        //    DataSet dataSet = new DataSet("student");
-        //    Sqlda.Fill(dataSet);
-
-        //    foreach (DataRow row in dataSet.Tables[0].Rows)
-        //    {
-        //        yield return new Admin
-        //        {
-        //            idAdmin = Convert.ToString(row["idAdmin"]),
-        //            firstName = Convert.ToString(row["firstName"]),
-        //            lastName = Convert.ToString(row["lastName"]),
-        //            userId = Int32.Parse(Convert.ToString(row["userId"])),
-        //            telephone = Convert.ToString(row["telephone"]),
-        //            address = Convert.ToString(row["address"]),
-        //            aliasMailId = Convert.ToString(row["aliasMailId"]),
-        //            emailId = Convert.ToString(row["emailId"]),
-        //            skypeId = Convert.ToString(row["skypeId"])
-        //        };
-        //    }
-        //}
-
-        //public IEnumerable<Admin> GetAdminByUserId(int userId)
-        //{
-
-        //    cnn = new SqlConnection(cfmgr);
-        //    cnn.Open();
-
-        //    SqlCommand comm = new SqlCommand("Select idAdmin, firstName, lastName, userId, telephone, address, aliasMailId, emailId, skypeId  from admin where userId = " + userId + " ", cnn);
-        //    SqlDataAdapter Sqlda = new SqlDataAdapter(comm);
-
-        //    DataSet dataSet = new DataSet("admin");
-        //    Sqlda.Fill(dataSet);
-
-        //    foreach (DataRow row in dataSet.Tables[0].Rows)
-        //    {
-        //        yield return new Admin
-        //        {
-        //            idAdmin = Convert.ToString(row["idAdmin"]),
-        //            firstName = Convert.ToString(row["firstName"]),
-        //            lastName = Convert.ToString(row["lastName"]),
-        //            userId = Int32.Parse(Convert.ToString(row["userId"])),
-        //            telephone = Convert.ToString(row["telephone"]),
-        //            address = Convert.ToString(row["address"]),
-        //            aliasMailId = Convert.ToString(row["aliasMailId"]),
-        //            emailId = Convert.ToString(row["emailId"]),
-        //            skypeId = Convert.ToString(row["skypeId"])
-        //        };
-        //    }
-        //}
+                };
+            }
 
 
+
+
+
+        }
     }
 }

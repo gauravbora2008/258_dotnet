@@ -224,3 +224,4 @@ C:\Users\dell\Desktop\College\CSC258\Project\NET Server Project\jinsongo-mla-ser
 C:\Users\dell\Desktop\College\CSC258\Project\NET Server Project\jinsongo-mla-server-d05b9a4780cf\MlaWebApi\obj\Debug\MlaWebApi.dll
 C:\Users\dell\Desktop\College\CSC258\Project\NET Server Project\jinsongo-mla-server-d05b9a4780cf\MlaWebApi\obj\Debug\MlaWebApi.pdb
 C:\Users\dell\Desktop\College\CSC258\Project\NET Server Project\jinsongo-mla-server-d05b9a4780cf\MlaWebApi\obj\Debug\MlaWebApi.csproj.CoreCompileInputs.cache
+C:\Users\dell\Desktop\College\CSC258\Project\NET Server Project\jinsongo-mla-server-d05b9a4780cf\MlaWebApi\obj\Debug\MlaWebApi.csprojAssemblyReference.cache
